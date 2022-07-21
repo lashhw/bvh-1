@@ -37,38 +37,23 @@ int main() {
     Vec3 horizontal(0.2, 0, 0);
     Vec3 vertical(0, -0.2, 0);
 
-    float min_t = FLT_MAX;
-    float max_t = 0;
-    float t[800][800];
-    bool miss[800][800];
+    std::ofstream file("../image.ppm");
+    file << "P3\n800 800\n255\n";
     for (int j = 0; j < 800; j++) {
         for (int i = 0; i < 800; i++) {
             Vec3 lookat = upper_left_corner + horizontal * (i / 800.0f) + vertical * (j / 800.0f);
             Ray ray(origin, lookat - origin);
 
-            Triangle::Intersection intersection;
+            Bvh::Intersection intersection;
             bool hit = bvh.traverse(ray, intersection);
             if (hit) {
-                min_t = std::min(min_t, intersection.t);
-                max_t = std::max(max_t, intersection.t);
-                t[i][j] = intersection.t;
-                miss[i][j] = false;
+                Vec3 color = triangles[intersection.index].n;
+                float length = std::sqrt(color.x * color.x + color.y * color.y + color.z * color.z);
+                color = (color / length) + Vec3(1, 1, 1);
+                color = color / 2;
+                file << (int)(color.x * 255) << " " << (int)(color.y * 255) << " " << (int)(color.z * 255) << " ";
             }
-            else miss[i][j] = true;
-        }
-    }
-
-    std::ofstream file("../image.ppm");
-    file << "P3\n800 800\n255\n";
-    for (int j = 0; j < 800; j++) {
-        for (int i = 0; i < 800; i++) {
-            if (miss[i][j]) file << "0 0 0 ";
-            else {
-                float normalized_t = (t[i][j] - min_t) / (max_t - min_t);
-                float color = std::sqrt(1 - normalized_t);
-                int r = std::min(255, int(color * 255));
-                file << r << " " << r << " " << r << " ";
-            }
+            else file << "0 0 0 ";
         }
     }
 }

@@ -130,20 +130,26 @@ struct Bvh {
         }
     }
 
-    bool intersect_leaf(const Node &node, Ray &ray, Triangle::Intersection &intersection) {
+    struct Intersection {
+        int index;
+        Triangle::Intersection triangle_intersection;
+    };
+
+    bool intersect_leaf(const Node &node, Ray &ray, Intersection &intersection) {
         bool hit_anything = false;
         for (int i = node.first_primitive_index;
              i < node.first_primitive_index + node.num_primitives;
              i++) {
-            if ((*triangles_ptr)[i].intersect(ray, intersection)) {
-                ray.tmax = intersection.t;
+            if ((*triangles_ptr)[i].intersect(ray, intersection.triangle_intersection)) {
+                intersection.index = i;
+                ray.tmax = intersection.triangle_intersection.t;
                 hit_anything = true;
             }
         }
         return hit_anything;
     }
 
-    bool traverse(Ray &ray, Triangle::Intersection &intersection) {
+    bool traverse(Ray &ray, Intersection &intersection) {
         if (nodes[0].is_leaf())
             return intersect_leaf(nodes[0], ray, intersection);
 
