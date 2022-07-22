@@ -40,93 +40,112 @@ struct Bvh {
                       [&](int i, int j) { return centers[i][axis] < centers[j][axis]; });
         }
 
-        build(0, 0, num_primitives, 0, bboxes, centers, costs, marks, sorted_references);
+        // build BVH
+        std::stack<std::array<int, 4>> stack;  // node_index, begin, end, depth
+        int node_index = 0;
+        int begin = 0;
+        int end = num_primitives;
+        int depth = 0;
+        auto check_and_update_and_pop_stack = [&]() -> bool {
+            if (stack.empty()) return false;
+            node_index = stack.top()[0];
+            begin = stack.top()[1];
+            end = stack.top()[2];
+            depth = stack.top()[3];
+            stack.pop();
+            return true;
+        };
+
+        while (true) {
+            Node &curr_node = nodes[node_index];
+            int curr_num_primitives = end - begin;
+
+            if (curr_num_primitives <= 1 || depth >= MAX_DEPTH) {
+                curr_node.num_primitives = curr_num_primitives;
+                curr_node.first_primitive_index = begin;
+
+                if (check_and_update_and_pop_stack()) continue;
+                else break;
+            }
+
+            float best_cost = FLT_MAX;
+            int best_axis = -1;
+            int best_split_index = -1;
+
+            for (int axis = 0; axis < 3; axis++) {
+                BoundingBox tmp_bbox;
+                for (int i = end - 1; i > begin; i--) {
+                    tmp_bbox.extend(bboxes[sorted_references[axis][i]]);
+                    costs[i] = tmp_bbox.half_area() * (end - i);
+                }
+
+                tmp_bbox = BoundingBox();
+                for (int i = begin; i < end - 1; i++) {
+                    tmp_bbox.extend(bboxes[sorted_references[axis][i]]);
+                    float cost = tmp_bbox.half_area() * (i + 1 - begin) + costs[i + 1];
+                    if (cost < best_cost) {
+                        best_cost = cost;
+                        best_axis = axis;
+                        best_split_index = i + 1;
+                    }
+                }
+            }
+
+            float max_split_cost = curr_node.bbox.half_area() * (curr_num_primitives - 1);
+            if (best_cost >= max_split_cost) {
+                curr_node.num_primitives = curr_num_primitives;
+                curr_node.first_primitive_index = begin;
+
+                if (check_and_update_and_pop_stack()) continue;
+                else break;
+            }
+
+            int left_node_index = num_nodes;
+            Node &left_node = nodes[left_node_index];
+            Node &right_node = nodes[left_node_index + 1];
+            for (int i = begin; i < best_split_index; i++) {
+                left_node.bbox.extend(bboxes[sorted_references[best_axis][i]]);
+                marks[sorted_references[best_axis][i]] = true;
+            }
+            for (int i = best_split_index; i < end; i++) {
+                right_node.bbox.extend(bboxes[sorted_references[best_axis][i]]);
+                marks[sorted_references[best_axis][i]] = false;
+            }
+
+            int other_axis[2] = { (best_axis + 1) % 3, (best_axis + 2) % 3 };
+            std::stable_partition(sorted_references[other_axis[0]].begin() + begin,
+                                  sorted_references[other_axis[0]].begin() + end,
+                                  [&](int i) { return marks[i]; });
+            std::stable_partition(sorted_references[other_axis[1]].begin() + begin,
+                                  sorted_references[other_axis[1]].begin() + end,
+                                  [&](int i) { return marks[i]; });
+
+            num_nodes += 2;
+            curr_node.num_primitives = 0;
+            curr_node.left_node_index = left_node_index;
+
+            int left_size = best_split_index - begin;
+            int right_size = end - best_split_index;
+
+            if (left_size < right_size) {
+                stack.push( { left_node_index + 1, best_split_index, end, depth + 1 } );
+                node_index = left_node_index;
+                begin = begin;
+                end = best_split_index;
+                depth = depth + 1;
+            } else {
+                stack.push( { left_node_index, begin, best_split_index, depth + 1 } );
+                node_index = left_node_index + 1;
+                begin = best_split_index;
+                end = end;
+                depth = depth + 1;
+            }
+        }
 
         // rearrange triangles based on sorted_references
         std::vector<Triangle> triangles_temp = *triangles_ptr;
         for (int i = 0; i < num_primitives; i++) {
             (*triangles_ptr)[i] = triangles_temp[sorted_references[0][i]];
-        }
-    }
-
-    void build(int node_index, int begin, int end, int depth,
-               std::vector<BoundingBox> &bboxes,
-               const std::vector<Vec3> &centers,
-               std::vector<float> &costs,
-               std::vector<bool> &marks,
-               std::array<std::vector<int>, 3> &sorted_references) {
-        Node &curr_node = nodes[node_index];
-        int num_curr_primitives = end - begin;
-
-        if (num_curr_primitives <= 1 || depth >= MAX_DEPTH) {
-            curr_node.num_primitives = num_curr_primitives;
-            curr_node.first_primitive_index = begin;
-            return;
-        }
-
-        float best_cost = FLT_MAX;
-        int best_axis = -1;
-        int best_split_index = -1;
-
-        for (int axis = 0; axis < 3; axis++) {
-            BoundingBox tmp_bbox;
-            for (int i = end - 1; i > begin; i--) {
-                tmp_bbox.extend(bboxes[sorted_references[axis][i]]);
-                costs[i] = tmp_bbox.half_area() * (end - i);
-            }
-
-            tmp_bbox = BoundingBox();
-            for (int i = begin; i < end - 1; i++) {
-                tmp_bbox.extend(bboxes[sorted_references[axis][i]]);
-                float cost = tmp_bbox.half_area() * (i + 1 - begin) + costs[i + 1];
-                if (cost < best_cost) {
-                    best_cost = cost;
-                    best_axis = axis;
-                    best_split_index = i + 1;
-                }
-            }
-        }
-
-        float max_split_cost = curr_node.bbox.half_area() * (num_curr_primitives - 1);
-        if (best_cost >= max_split_cost) {
-            curr_node.num_primitives = num_curr_primitives;
-            curr_node.first_primitive_index = begin;
-            return;
-        }
-
-        int left_child_index = num_nodes;
-        Node &left_node = nodes[left_child_index];
-        Node &right_node = nodes[left_child_index + 1];
-        for (int i = begin; i < best_split_index; i++) {
-            left_node.bbox.extend(bboxes[sorted_references[best_axis][i]]);
-            marks[sorted_references[best_axis][i]] = true;
-        }
-        for (int i = best_split_index; i < end; i++) {
-            right_node.bbox.extend(bboxes[sorted_references[best_axis][i]]);
-            marks[sorted_references[best_axis][i]] = false;
-        }
-
-        int other_axis[2] = { (best_axis + 1) % 3, (best_axis + 2) % 3 };
-        std::stable_partition(sorted_references[other_axis[0]].begin() + begin,
-                              sorted_references[other_axis[0]].begin() + end,
-                              [&](int i) { return marks[i]; });
-        std::stable_partition(sorted_references[other_axis[1]].begin() + begin,
-                              sorted_references[other_axis[1]].begin() + end,
-                              [&](int i) { return marks[i]; });
-
-        num_nodes += 2;
-        curr_node.num_primitives = 0;
-        curr_node.left_node_index = left_child_index;
-
-        int left_size = best_split_index - begin;
-        int right_size = end - best_split_index;
-
-        if (left_size < right_size) {
-            build(left_child_index, begin, best_split_index, depth + 1, bboxes, centers, costs, marks, sorted_references);
-            build(left_child_index + 1, best_split_index, end, depth + 1, bboxes, centers, costs, marks, sorted_references);
-        } else {
-            build(left_child_index + 1, best_split_index, end, depth + 1, bboxes, centers, costs, marks, sorted_references);
-            build(left_child_index, begin, best_split_index, depth + 1, bboxes, centers, costs, marks, sorted_references);
         }
     }
 
