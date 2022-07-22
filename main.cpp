@@ -10,6 +10,8 @@
 
 #include "vec3.hpp"
 #include "ray.hpp"
+#include "matrix4x4.hpp"
+#include "transform.hpp"
 #include "bounding_box.hpp"
 #include "triangle.hpp"
 #include "aabb_intersector.hpp"
@@ -20,6 +22,12 @@ int main() {
     happly::PLYData ply_in("../bun_zipper.ply");
     std::vector<std::array<double, 3>> v_pos = ply_in.getVertexPositions();
     std::vector<std::vector<size_t>> f_index = ply_in.getFaceIndices<size_t>();
+
+    Transform transform(Matrix4x4::Translate(0.02f, -0.1f, 0.f));
+    transform.composite(Matrix4x4::Rotate(Vec3(0.f, 1.f, 0.f), 0.1f));
+    std::for_each(v_pos.begin(), v_pos.end(), [&](std::array<double, 3> &v) {
+        transform.apply(v);
+    });
 
     std::vector<Triangle> triangles;
     for (const auto &face : f_index) {
@@ -33,7 +41,7 @@ int main() {
     std::cout << "done" << std::endl;
 
     Vec3 origin(0, 0, 1);
-    Vec3 upper_left_corner(-0.12, 0.2, 0);
+    Vec3 upper_left_corner(-0.1, 0.1, 0);
     Vec3 horizontal(0.2, 0, 0);
     Vec3 vertical(0, -0.2, 0);
 
