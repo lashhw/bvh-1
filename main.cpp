@@ -45,7 +45,7 @@ int main() {
     Vec3 horizontal(0.2, 0, 0);
     Vec3 vertical(0, -0.2, 0);
 
-    std::ofstream file("../image.ppm");
+    std::ofstream file("image.ppm");
     file << "P3\n800 800\n255\n";
     for (int j = 0; j < 800; j++) {
         for (int i = 0; i < 800; i++) {

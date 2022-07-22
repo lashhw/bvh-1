@@ -13,7 +13,7 @@ struct AABBIntersector {
         scaled_origin = -ray.origin * inverse_direction;
     }
 
-    bool intersect(const BoundingBox &bbox, const Ray &ray, float &entry) const {
+    bool intersect(const BoundingBox &bbox, float &entry) const {
         entry = std::max({
             inverse_direction.x * bbox.bounds[0 + octant[0]] + scaled_origin.x,
             inverse_direction.y * bbox.bounds[2 + octant[1]] + scaled_origin.y,

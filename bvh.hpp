@@ -163,7 +163,7 @@ struct Bvh {
             Node *right_node_ptr = left_node_ptr + 1;
 
             float entry_left;
-            if (aabb_intersector.intersect(left_node_ptr->bbox, ray, entry_left)) {
+            if (aabb_intersector.intersect(left_node_ptr->bbox, entry_left)) {
                 if (left_node_ptr->is_leaf()) {
                     hit_anything |= intersect_leaf(*left_node_ptr, ray, intersection);
                     left_node_ptr = nullptr;
@@ -173,7 +173,7 @@ struct Bvh {
             }
 
             float entry_right;
-            if (aabb_intersector.intersect(right_node_ptr->bbox, ray, entry_right)) {
+            if (aabb_intersector.intersect(right_node_ptr->bbox, entry_right)) {
                 if (right_node_ptr->is_leaf()) {
                     hit_anything |= intersect_leaf(*right_node_ptr, ray, intersection);
                     right_node_ptr = nullptr;
