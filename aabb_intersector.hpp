@@ -6,9 +6,10 @@ struct AABBIntersector {
         : octant { std::signbit(ray.direction.x),
                    std::signbit(ray.direction.y),
                    std::signbit(ray.direction.z) } {
-        inverse_direction = Vec3(1.0f / ray.direction.x,
-                                 1.0f / ray.direction.y,
-                                 1.0f / ray.direction.z);
+        static constexpr float epsilon = FLT_EPSILON;
+        inverse_direction = Vec3(1.0f / ((fabs(ray.direction.x) < epsilon) ? std::copysign(epsilon, ray.direction.x) : ray.direction.x),
+                                 1.0f / ((fabs(ray.direction.y) < epsilon) ? std::copysign(epsilon, ray.direction.y) : ray.direction.y),
+                                 1.0f / ((fabs(ray.direction.z) < epsilon) ? std::copysign(epsilon, ray.direction.z) : ray.direction.z));
         scaled_origin = -ray.origin * inverse_direction;
     }
 
